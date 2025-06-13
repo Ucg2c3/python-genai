@@ -18,6 +18,7 @@
 import logging
 from typing import Any, Optional, Union
 from urllib.parse import urlencode
+
 from . import _api_module
 from . import _common
 from . import _transformers as t
@@ -193,8 +194,22 @@ def _FunctionDeclaration_to_mldev(
   if getv(from_object, ['parameters']) is not None:
     setv(to_object, ['parameters'], getv(from_object, ['parameters']))
 
+  if getv(from_object, ['parameters_json_schema']) is not None:
+    setv(
+        to_object,
+        ['parametersJsonSchema'],
+        getv(from_object, ['parameters_json_schema']),
+    )
+
   if getv(from_object, ['response']) is not None:
     setv(to_object, ['response'], getv(from_object, ['response']))
+
+  if getv(from_object, ['response_json_schema']) is not None:
+    setv(
+        to_object,
+        ['responseJsonSchema'],
+        getv(from_object, ['response_json_schema']),
+    )
 
   return to_object
 
@@ -865,8 +880,22 @@ def _FunctionDeclaration_to_vertex(
   if getv(from_object, ['parameters']) is not None:
     setv(to_object, ['parameters'], getv(from_object, ['parameters']))
 
+  if getv(from_object, ['parameters_json_schema']) is not None:
+    setv(
+        to_object,
+        ['parametersJsonSchema'],
+        getv(from_object, ['parameters_json_schema']),
+    )
+
   if getv(from_object, ['response']) is not None:
     setv(to_object, ['response'], getv(from_object, ['response']))
+
+  if getv(from_object, ['response_json_schema']) is not None:
+    setv(
+        to_object,
+        ['responseJsonSchema'],
+        getv(from_object, ['response_json_schema']),
+    )
 
   return to_object
 
@@ -1092,7 +1121,13 @@ def _Tool_to_vertex(
     )
 
   if getv(from_object, ['url_context']) is not None:
-    raise ValueError('url_context parameter is not supported in Vertex AI.')
+    setv(
+        to_object,
+        ['urlContext'],
+        _UrlContext_to_vertex(
+            api_client, getv(from_object, ['url_context']), to_object
+        ),
+    )
 
   if getv(from_object, ['code_execution']) is not None:
     setv(to_object, ['codeExecution'], getv(from_object, ['code_execution']))
