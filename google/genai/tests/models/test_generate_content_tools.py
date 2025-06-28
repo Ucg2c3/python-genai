@@ -108,7 +108,7 @@ test_table: list[pytest_helper.TestTableItem] = [
         name='test_google_search_retrieval',
         parameters=types._GenerateContentParameters(
             model='gemini-1.5-flash',
-            contents=t.t_contents(None, 'Why is the sky blue?'),
+            contents=t.t_contents('Why is the sky blue?'),
             config={'tools': [{'google_search_retrieval': {}}]},
         ),
     ),
@@ -116,7 +116,7 @@ test_table: list[pytest_helper.TestTableItem] = [
         name='test_vai_search',
         parameters=types._GenerateContentParameters(
             model='gemini-1.5-flash',
-            contents=t.t_contents(None, 'what is vertex ai search?'),
+            contents=t.t_contents('what is vertex ai search?'),
             config={
                 'tools': [{
                     'retrieval': {
@@ -135,7 +135,7 @@ test_table: list[pytest_helper.TestTableItem] = [
         name='test_vai_google_search',
         parameters=types._GenerateContentParameters(
             model='gemini-1.5-flash',
-            contents=t.t_contents(None, 'why is the sky blue?'),
+            contents=t.t_contents('why is the sky blue?'),
             config={
                 'tools': [
                     types.Tool(
@@ -156,7 +156,7 @@ test_table: list[pytest_helper.TestTableItem] = [
         name='test_vai_search_engine',
         parameters=types._GenerateContentParameters(
             model='gemini-2.0-flash-001',
-            contents=t.t_contents(None, 'why is the sky blue?'),
+            contents=t.t_contents('why is the sky blue?'),
             config={
                 'tools': [
                     types.Tool(
@@ -176,7 +176,6 @@ test_table: list[pytest_helper.TestTableItem] = [
         parameters=types._GenerateContentParameters(
             model='gemini-1.5-flash',
             contents=t.t_contents(
-                None,
                 'How much gain or loss did Google get in the Motorola Mobile'
                 ' deal in 2014?',
             ),
@@ -204,7 +203,6 @@ test_table: list[pytest_helper.TestTableItem] = [
         parameters=types._GenerateContentParameters(
             model='gemini-2.0-flash-001',
             contents=t.t_contents(
-                None,
                 'How much gain or loss did Google get in the Motorola Mobile'
                 ' deal in 2014?',
             ),
@@ -253,7 +251,6 @@ test_table: list[pytest_helper.TestTableItem] = [
         parameters=types._GenerateContentParameters(
             model='gemini-1.5-flash',
             contents=t.t_contents(
-                None,
                 'What is the sum of the first 50 prime numbers? '
                 + 'Generate and run code for the calculation, and make sure you'
                 ' get all 50.',
@@ -265,7 +262,7 @@ test_table: list[pytest_helper.TestTableItem] = [
         name='test_function_google_search_retrieval_with_long_lat',
         parameters=types._GenerateContentParameters(
             model='gemini-1.5-flash',
-            contents=t.t_contents(None, 'what is the price of GOOG?'),
+            contents=t.t_contents('what is the price of GOOG?'),
             config=types.GenerateContentConfig(
                 tools=[
                     types.Tool(
@@ -291,11 +288,10 @@ test_table: list[pytest_helper.TestTableItem] = [
         parameters=types._GenerateContentParameters(
             model='gemini-2.5-flash-preview-04-17',
             contents=t.t_contents(
-                None, 'what are the top headlines on https://news.google.com'
+                'what are the top headlines on https://news.google.com'
             ),
             config={'tools': [{'url_context': {}}]},
         ),
-        exception_if_vertex='not supported in Vertex AI',
     ),
     pytest_helper.TestTableItem( 
         # https://github.com/googleapis/python-genai/issues/830
@@ -448,7 +444,7 @@ def test_automatic_function_calling_with_customized_math_rule(client):
     return numerator // denominator + 1
 
   response = client.models.generate_content(
-      model='gemini-1.5-flash',
+      model='gemini-2.5-flash-preview-04-17',
       contents='what is the result of 1000/2?',
       config={
           'tools': [customized_divide_integers],
@@ -963,7 +959,7 @@ async def test_automatic_function_calling_with_coroutine_function_async(
     return a // b
 
   response = await client.aio.models.generate_content(
-      model='gemini-1.5-flash',
+      model='gemini-2.5-flash-preview-05-20',
       contents='what is the result of 1000/2?',
       config={
           'tools': [divide_integers],
@@ -980,7 +976,7 @@ async def test_automatic_function_calling_async(client):
     return a // b
 
   response = await client.aio.models.generate_content(
-      model='gemini-1.5-flash',
+      model='gemini-2.5-flash-preview-05-20',
       contents='what is the result of 1000/2?',
       config={
           'tools': [divide_integers],
@@ -1012,7 +1008,7 @@ async def test_automatic_function_calling_async_with_exception(client):
 @pytest.mark.asyncio
 async def test_automatic_function_calling_async_float_without_decimal(client):
   response = await client.aio.models.generate_content(
-      model='gemini-1.5-flash',
+      model='gemini-2.5-flash-preview-05-20',
       contents='what is the result of 1000.0/2.0?',
       config={
           'tools': [divide_floats, divide_integers],
@@ -1058,7 +1054,7 @@ async def test_automatic_function_calling_async_with_async_function(client):
     return 'windy'
 
   response = await client.aio.models.generate_content(
-      model='gemini-1.5-flash',
+      model='gemini-2.5-flash-preview-05-20',
       contents='what is the weather in San Francisco?',
       config={
           'tools': [get_current_weather_async],
@@ -1080,7 +1076,7 @@ async def test_automatic_function_calling_async_with_async_function_stream(
     return 'windy'
 
   response = await client.aio.models.generate_content_stream(
-      model='gemini-1.5-flash',
+      model='gemini-2.5-flash-preview-05-20',
       contents='what is the weather in San Francisco?',
       config={
           'tools': [get_current_weather_async],

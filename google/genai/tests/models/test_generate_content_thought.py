@@ -25,21 +25,20 @@ test_table: list[pytest_helper.TestTableItem] = [
         name='test_generate_content_thought',
         parameters=types._GenerateContentParameters(
             model='gemini-2.5-pro-preview-03-25',
-            contents=t.t_contents(None, 'Explain the monty hall problem.'),
+            contents=t.t_contents('Explain the monty hall problem.'),
             config={
                 'thinking_config': {
                     'include_thoughts': True,
                     'thinking_budget': 10000},
             },
         ),
-        exception_if_vertex='400',
     ),
     pytest_helper.TestTableItem(
         name='test_generate_content_thought_v1alpha',
         parameters=types._GenerateContentParameters(
             model='gemini-2.5-pro-preview-03-25',
             contents=t.t_contents(
-                None, 'What is the sum of natural numbers from 1 to 100?'
+                'What is the sum of natural numbers from 1 to 100?'
             ),
             config={
                 'thinking_config': {

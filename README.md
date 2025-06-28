@@ -109,6 +109,49 @@ client = genai.Client(
 )
 ```
 
+### Faster async client option: Aiohttp
+
+By default we use httpx for both sync and async client implementations. In order
+to have faster performance, you may install `google-genai[aiohttp]`. In Gen AI
+SDK we configure `trust_env=True` to match with the default behavior of httpx.
+Additional args of `aiohttp.ClientSession.request()` ([see _RequestOptions args](https://github.com/aio-libs/aiohttp/blob/v3.12.13/aiohttp/client.py#L170)) can be passed
+through the following way:
+
+```python
+
+http_options = types.HttpOptions(
+    async_client_args={'cookies': ..., 'ssl': ...},
+)
+
+client=Client(..., http_options=http_options)
+```
+
+### Proxy
+
+Both httpx and aiohttp libraries use `urllib.request.getproxies` from
+environment variables. Before client initialization, you may set proxy (and
+optional SSL_CERT_FILE) by setting the environment variables:
+
+
+```bash
+export HTTPS_PROXY='http://username:password@proxy_uri:port'
+export SSL_CERT_FILE='client.pem'
+```
+
+If you need `socks5` proxy, httpx [supports](https://www.python-httpx.org/advanced/proxies/#socks) `socks5` proxy if you pass it via
+args to `httpx.Client()`. You may install `httpx[socks]` to use it.
+Then, you can pass it through the following way:
+
+```python
+
+http_options = types.HttpOptions(
+    client_args={'proxy': 'socks5://user:pass@host:port'},
+    async_client_args={'proxy': 'socks5://user:pass@host:port'},,
+)
+
+client=Client(..., http_options=http_options)
+```
+
 ## Types
 
 Parameter types can be specified as either dictionaries(`TypedDict`) or
@@ -666,6 +709,53 @@ response = client.models.generate_content(
     ),
 )
 ```
+
+#### Model Context Protocol (MCP) support (experimental)
+
+Built-in [MCP](https://modelcontextprotocol.io/introduction) support is an
+experimental feature. You can pass a local MCP server as a tool directly.
+
+```python
+import os
+import asyncio
+from datetime import datetime
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+from google import genai
+
+client = genai.Client()
+
+# Create server parameters for stdio connection
+server_params = StdioServerParameters(
+    command="npx",  # Executable
+    args=["-y", "@philschmid/weather-mcp"],  # MCP Server
+    env=None,  # Optional environment variables
+)
+
+async def run():
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            # Prompt to get the weather for the current day in London.
+            prompt = f"What is the weather in London in {datetime.now().strftime('%Y-%m-%d')}?"
+
+            # Initialize the connection between client and server
+            await session.initialize()
+
+            # Send request to the model with MCP function declarations
+            response = await client.aio.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=genai.types.GenerateContentConfig(
+                    temperature=0,
+                    tools=[session],  # uses the session, will automatically call the tool using automatic function calling
+                ),
+            )
+            print(response.text)
+
+# Start the asyncio event loop and run the main function
+asyncio.run(run())
+```
+
 ### JSON Response Schema
 
 However you define your schema, don't duplicate it in your input prompt,
@@ -1183,7 +1273,7 @@ client.
 
 ### Tune
 
--   Vertex AI supports tuning from GCS source
+-   Vertex AI supports tuning from GCS source or from a Vertex Multimodal Dataset
 -   Gemini Developer API supports tuning from inline examples
 
 ```python
@@ -1192,10 +1282,12 @@ from google.genai import types
 if client.vertexai:
     model = 'gemini-2.0-flash-001'
     training_dataset = types.TuningDataset(
+      # or gcs_uri=my_vertex_multimodal_dataset
         gcs_uri='gs://cloud-samples-data/ai-platform/generative_ai/gemini-1_5/text/sft_train_data.jsonl',
     )
 else:
     model = 'models/gemini-2.0-flash-001'
+    # or gcs_uri=my_vertex_multimodal_dataset.resource_name
     training_dataset = types.TuningDataset(
         examples=[
             types.TuningExample(
