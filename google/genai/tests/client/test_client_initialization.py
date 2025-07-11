@@ -16,6 +16,7 @@
 
 """Tests for client initialization."""
 
+import httpx
 import logging
 import os
 import ssl
@@ -31,15 +32,68 @@ from ... import _replay_api_client as replay_api_client
 from ... import Client
 
 
-def test_ml_dev_from_env(monkeypatch):
-  api_key = "google_api_key"
-  monkeypatch.setenv("GOOGLE_API_KEY", api_key)
+def test_ml_dev_from_gemini_env_only(monkeypatch):
+  api_key = "gemini_api_key"
+  monkeypatch.setenv("GEMINI_API_KEY", api_key)
+  monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
 
   client = Client()
 
   assert not client.models._api_client.vertexai
   assert client.models._api_client.api_key == api_key
   assert isinstance(client.models._api_client, api_client.BaseApiClient)
+
+
+def test_ml_dev_from_gemini_env_with_google_env_empty(monkeypatch):
+  api_key = "gemini_api_key"
+  monkeypatch.setenv("GEMINI_API_KEY", api_key)
+  monkeypatch.setenv("GOOGLE_API_KEY", "")
+
+  client = Client()
+
+  assert not client.models._api_client.vertexai
+  assert client.models._api_client.api_key == api_key
+  assert isinstance(client.models._api_client, api_client.BaseApiClient)
+
+
+def test_ml_dev_from_google_env_only(monkeypatch):
+  api_key = "google_api_key"
+  monkeypatch.setenv("GOOGLE_API_KEY", api_key)
+  monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+  client = Client()
+
+  assert not client.models._api_client.vertexai
+  assert client.models._api_client.api_key == api_key
+  assert isinstance(client.models._api_client, api_client.BaseApiClient)
+
+
+def test_ml_dev_both_env_key_set(monkeypatch, caplog):
+  caplog.set_level(logging.DEBUG, logger="google_genai._api_client")
+  google_api_key = "google_api_key"
+  gemini_api_key = "gemini_api_key"
+  monkeypatch.setenv("GOOGLE_API_KEY", google_api_key)
+  monkeypatch.setenv("GEMINI_API_KEY", gemini_api_key)
+
+  client = Client()
+
+  assert not client.models._api_client.vertexai
+  assert client.models._api_client.api_key == google_api_key
+  assert isinstance(client.models._api_client, api_client.BaseApiClient)
+  assert (
+      "Both GOOGLE_API_KEY and GEMINI_API_KEY are set. Using GOOGLE_API_KEY."
+      in caplog.text
+  )
+
+
+def test_api_key_with_new_line(monkeypatch, caplog):
+  caplog.set_level(logging.DEBUG, logger="google_genai._api_client")
+  api_key = "gemini_api_key\r\n"
+  monkeypatch.setenv("GOOGLE_API_KEY", api_key)
+
+  client = Client()
+
+  assert client.models._api_client.api_key == 'gemini_api_key'
 
 
 def test_ml_dev_from_constructor():
@@ -276,6 +330,7 @@ def test_invalid_vertexai_constructor_empty(monkeypatch):
     monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "")
     monkeypatch.setenv("GOOGLE_CLOUD_LOCATION", "")
     monkeypatch.setenv("GOOGLE_API_KEY", "")
+    monkeypatch.setenv("GEMINI_API_KEY", "")
 
     def mock_auth_default(scopes=None):
       return None, None
@@ -287,6 +342,7 @@ def test_invalid_vertexai_constructor_empty(monkeypatch):
 def test_invalid_mldev_constructor_empty(monkeypatch):
   with pytest.raises(ValueError):
     monkeypatch.setenv("GOOGLE_API_KEY", "")
+    monkeypatch.setenv("GEMINI_API_KEY", "")
     Client()
 
 
@@ -379,16 +435,22 @@ def test_invalid_mldev_constructor():
     assert isinstance(e, ValueError)
 
 
-def test_mldev_explicit_arg_precedence(monkeypatch):
+def test_mldev_explicit_arg_precedence(monkeypatch, caplog):
+  caplog.set_level(logging.DEBUG, logger="google_genai._api_client")
   api_key = "constructor_api_key"
 
-  monkeypatch.setenv("GOOGLE_API_KEY", "env_api_key")
+  monkeypatch.setenv("GOOGLE_API_KEY", "google_env_api_key")
+  monkeypatch.setenv("GEMINI_API_KEY", "gemini_env_api_key")
 
   client = Client(api_key=api_key)
 
   assert not client.models._api_client.vertexai
   assert client.models._api_client.api_key == api_key
   assert isinstance(client.models._api_client, api_client.BaseApiClient)
+  assert (
+      "Both GOOGLE_API_KEY and GEMINI_API_KEY are set. Using GOOGLE_API_KEY."
+      in caplog.text
+  )
 
 
 def test_replay_client_ml_dev_from_env(monkeypatch, use_vertex: bool):
@@ -464,10 +526,11 @@ def test_vertexai_apikey_from_constructor(monkeypatch):
   assert isinstance(client.models._api_client, api_client.BaseApiClient)
 
 
-def test_vertexai_apikey_from_env(monkeypatch):
+def test_vertexai_apikey_from_env_google_api_key_only(monkeypatch):
   # Vertex AI Express mode uses API key on Vertex AI.
   api_key = "vertexai_api_key"
   monkeypatch.setenv("GOOGLE_API_KEY", api_key)
+  monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
   # Due to proj/location taking precedence, need to clear proj/location env
   # variables.
@@ -482,6 +545,77 @@ def test_vertexai_apikey_from_env(monkeypatch):
   assert not client.models._api_client.location
   assert "aiplatform" in client._api_client._http_options.base_url
   assert isinstance(client.models._api_client, api_client.BaseApiClient)
+
+
+def test_vertexai_apikey_from_env_gemini_api_key_only(monkeypatch):
+  # Vertex AI Express mode uses API key on Vertex AI.
+  api_key = "vertexai_api_key"
+  monkeypatch.setenv("GEMINI_API_KEY", api_key)
+  monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+
+  # Due to proj/location taking precedence, need to clear proj/location env
+  # variables.
+  monkeypatch.setenv("GOOGLE_CLOUD_LOCATION", "")
+  monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "")
+
+  client = Client(vertexai=True)
+
+  assert client.models._api_client.vertexai
+  assert client.models._api_client.api_key == api_key
+  assert not client.models._api_client.project
+  assert not client.models._api_client.location
+  assert "aiplatform" in client._api_client._http_options.base_url
+  assert isinstance(client.models._api_client, api_client.BaseApiClient)
+
+
+def test_vertexai_apikey_from_env_gemini_api_key_with_google_api_key_empty(
+    monkeypatch,
+):
+  # Vertex AI Express mode uses API key on Vertex AI.
+  api_key = "vertexai_api_key"
+  monkeypatch.setenv("GEMINI_API_KEY", api_key)
+  monkeypatch.setenv("GOOGLE_API_KEY", "")
+
+  # Due to proj/location taking precedence, need to clear proj/location env
+  # variables.
+  monkeypatch.setenv("GOOGLE_CLOUD_LOCATION", "")
+  monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "")
+
+  client = Client(vertexai=True)
+
+  assert client.models._api_client.vertexai
+  assert client.models._api_client.api_key == api_key
+  assert not client.models._api_client.project
+  assert not client.models._api_client.location
+  assert "aiplatform" in client._api_client._http_options.base_url
+  assert isinstance(client.models._api_client, api_client.BaseApiClient)
+
+
+def test_vertexai_apikey_from_env_both_api_keys(monkeypatch, caplog):
+  caplog.set_level(logging.DEBUG, logger="google_genai._api_client")
+  # Vertex AI Express mode uses API key on Vertex AI.
+  google_api_key = "google_api_key"
+  gemini_api_key = "vertexai_api_key"
+  monkeypatch.setenv("GEMINI_API_KEY", gemini_api_key)
+  monkeypatch.setenv("GOOGLE_API_KEY", google_api_key)
+
+  # Due to proj/location taking precedence, need to clear proj/location env
+  # variables.
+  monkeypatch.setenv("GOOGLE_CLOUD_LOCATION", "")
+  monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "")
+
+  client = Client(vertexai=True)
+
+  assert client.models._api_client.vertexai
+  assert client.models._api_client.api_key == google_api_key
+  assert not client.models._api_client.project
+  assert not client.models._api_client.location
+  assert "aiplatform" in client._api_client._http_options.base_url
+  assert isinstance(client.models._api_client, api_client.BaseApiClient)
+  assert (
+      "Both GOOGLE_API_KEY and GEMINI_API_KEY are set. Using GOOGLE_API_KEY."
+      in caplog.text
+  )
 
 
 def test_vertexai_apikey_invalid_constructor1():
@@ -595,14 +729,23 @@ def test_client_logs_to_logger_instance(monkeypatch, caplog):
 
 
 def test_client_ssl_context_implicit_initialization():
-  client_args, async_client_args = api_client.BaseApiClient._ensure_ssl_ctx(
-      api_client.HttpOptions()
+  client_args, async_client_args = (
+      api_client.BaseApiClient._ensure_httpx_ssl_ctx(api_client.HttpOptions())
   )
 
   assert client_args["verify"]
-  assert async_client_args["verify"]
   assert isinstance(client_args["verify"], ssl.SSLContext)
-  assert isinstance(async_client_args["verify"], ssl.SSLContext)
+  try:
+    import aiohttp  # pylint: disable=g-import-not-at-top
+
+    async_client_args = api_client.BaseApiClient._ensure_aiohttp_ssl_ctx(
+        api_client.HttpOptions()
+    )
+    assert async_client_args["ssl"]
+    assert isinstance(async_client_args["ssl"], ssl.SSLContext)
+  except ImportError:
+    assert async_client_args["verify"]
+    assert isinstance(async_client_args["verify"], ssl.SSLContext)
 
 
 def test_client_ssl_context_explicit_initialization_same_args():
@@ -614,12 +757,22 @@ def test_client_ssl_context_explicit_initialization_same_args():
   options = api_client.HttpOptions(
       client_args={"verify": ctx}, async_client_args={"verify": ctx}
   )
-  client_args, async_client_args = api_client.BaseApiClient._ensure_ssl_ctx(
-      options
+  client_args, async_client_args = (
+      api_client.BaseApiClient._ensure_httpx_ssl_ctx(options)
   )
 
   assert client_args["verify"] == ctx
-  assert async_client_args["verify"] == ctx
+  try:
+    import aiohttp  # pylint: disable=g-import-not-at-top
+
+    async_client_args = api_client.BaseApiClient._ensure_aiohttp_ssl_ctx(
+        options
+    )
+    assert async_client_args["ssl"]
+    assert isinstance(async_client_args["ssl"], ssl.SSLContext)
+  except ImportError:
+    assert async_client_args["verify"]
+    assert isinstance(async_client_args["verify"], ssl.SSLContext)
 
 
 def test_client_ssl_context_explicit_initialization_separate_args():
@@ -636,12 +789,22 @@ def test_client_ssl_context_explicit_initialization_separate_args():
   options = api_client.HttpOptions(
       client_args={"verify": ctx}, async_client_args={"verify": async_ctx}
   )
-  client_args, async_client_args = api_client.BaseApiClient._ensure_ssl_ctx(
-      options
+  client_args, async_client_args = (
+      api_client.BaseApiClient._ensure_httpx_ssl_ctx(options)
   )
 
   assert client_args["verify"] == ctx
-  assert async_client_args["verify"] == async_ctx
+  try:
+    import aiohttp  # pylint: disable=g-import-not-at-top
+
+    async_client_args = api_client.BaseApiClient._ensure_aiohttp_ssl_ctx(
+        options
+    )
+    assert async_client_args["ssl"]
+    assert isinstance(async_client_args["ssl"], ssl.SSLContext)
+  except ImportError:
+    assert async_client_args["verify"]
+    assert isinstance(async_client_args["verify"], ssl.SSLContext)
 
 
 def test_client_ssl_context_explicit_initialization_sync_args():
@@ -651,12 +814,22 @@ def test_client_ssl_context_explicit_initialization_sync_args():
   )
 
   options = api_client.HttpOptions(client_args={"verify": ctx})
-  client_args, async_client_args = api_client.BaseApiClient._ensure_ssl_ctx(
-      options
+  client_args, async_client_args = (
+      api_client.BaseApiClient._ensure_httpx_ssl_ctx(options)
   )
 
   assert client_args["verify"] == ctx
-  assert async_client_args["verify"] == ctx
+  try:
+    import aiohttp  # pylint: disable=g-import-not-at-top
+
+    async_client_args = api_client.BaseApiClient._ensure_aiohttp_ssl_ctx(
+        options
+    )
+    assert async_client_args["ssl"]
+    assert isinstance(async_client_args["ssl"], ssl.SSLContext)
+  except ImportError:
+    assert async_client_args["verify"]
+    assert isinstance(async_client_args["verify"], ssl.SSLContext)
 
 
 def test_client_ssl_context_explicit_initialization_async_args():
@@ -666,12 +839,22 @@ def test_client_ssl_context_explicit_initialization_async_args():
   )
 
   options = api_client.HttpOptions(async_client_args={"verify": ctx})
-  client_args, async_client_args = api_client.BaseApiClient._ensure_ssl_ctx(
-      options
+  client_args, async_client_args = (
+      api_client.BaseApiClient._ensure_httpx_ssl_ctx(options)
   )
 
   assert client_args["verify"] == ctx
-  assert async_client_args["verify"] == ctx
+  try:
+    import aiohttp  # pylint: disable=g-import-not-at-top
+
+    async_client_args = api_client.BaseApiClient._ensure_aiohttp_ssl_ctx(
+        options
+    )
+    assert async_client_args["ssl"]
+    assert isinstance(async_client_args["ssl"], ssl.SSLContext)
+  except ImportError:
+    assert async_client_args["verify"]
+    assert isinstance(async_client_args["verify"], ssl.SSLContext)
 
 
 def test_constructor_with_base_url_from_http_options():
@@ -872,3 +1055,50 @@ def test_constructor_with_base_url_from_environment_variables(monkeypatch):
       ]
       == "https://vertex-base-url.com/"
   )
+
+
+def test_async_transport_absence_allows_aiohttp_to_be_used():
+  client = Client(
+      vertexai=True,
+      project="fake_project_id",
+      location="fake-location",
+  )
+
+  api_client.has_aiohttp = False
+  assert not client._api_client._use_aiohttp()
+
+  api_client.has_aiohttp = True
+  assert client._api_client._use_aiohttp()
+
+
+def test_async_async_client_args_without_transport_allows_aiohttp_to_be_used():
+  client = Client(
+      vertexai=True,
+      project="fake_project_id",
+      location="fake-location",
+      http_options=api_client.HttpOptions(async_client_args={}),
+  )
+
+  api_client.has_aiohttp = False
+  assert not client._api_client._use_aiohttp()
+
+  api_client.has_aiohttp = True
+  assert client._api_client._use_aiohttp()
+
+
+def test_async_transport_forces_httpx_regardless_of_aiohttp_availability():
+
+  client = Client(
+      vertexai=True,
+      project="fake_project_id",
+      location="fake-location",
+      http_options=api_client.HttpOptions(
+          async_client_args={"transport": httpx.AsyncBaseTransport()}
+      ),
+  )
+
+  api_client.has_aiohttp = False
+  assert not client._api_client._use_aiohttp()
+
+  api_client.has_aiohttp = True
+  assert not client._api_client._use_aiohttp()
